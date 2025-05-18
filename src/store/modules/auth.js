@@ -1,6 +1,8 @@
+import router from '@/router';
 import apiClient from '@/service/api.service';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+
 
 // Helper function to extract user ID from token - moved outside the actions object
 function getUserIdFromToken(token) {
@@ -77,11 +79,22 @@ const actions = {
         refreshToken, 
         user, 
         roles,
-        permissions: [] // Your API doesn't return permissions, set as empty array
+        permissions: [] 
       });
       
       // Setup interceptors after successful login
       dispatch('setupInterceptors');
+
+      console.log('User has Official role, redirecting to participants page');
+    
+      // Add a small delay to ensure state is updated before navigation
+      setTimeout(() => {
+        if (roles.includes('Official')) {
+          router.push('/participants');
+        } else {
+          router.push('/');
+        }
+      }, 100);
       
        // Setup auth token for future requests
        //setupAuthToken(token);

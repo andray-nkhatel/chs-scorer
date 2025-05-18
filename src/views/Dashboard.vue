@@ -1,13 +1,8 @@
 <script setup>
-import BestSellingWidget from '@/components/dashboard/BestSellingWidget.vue';
-import NotificationsWidget from '@/components/dashboard/NotificationsWidget.vue';
-import RecentSalesWidget from '@/components/dashboard/RecentSalesWidget.vue';
-import RevenueStreamWidget from '@/components/dashboard/RevenueStreamWidget.vue';
-import StatsWidget from '@/components/dashboard/StatsWidget.vue';
 </script>
 
 <template>
-    <div class="grid grid-cols-12 gap-8">
+    <!-- <div class="grid grid-cols-12 gap-8">
         <StatsWidget />
 
         <div class="col-span-12 xl:col-span-6">
@@ -17,6 +12,11 @@ import StatsWidget from '@/components/dashboard/StatsWidget.vue';
         <div class="col-span-12 xl:col-span-6">
             <RevenueStreamWidget />
             <NotificationsWidget />
-        </div>
+        </div> 
+    </div> -->
+
+    <div className="card">
+        <div class="font-semibold text-xl mb-4">Empty Page</div>
+        <p>This page intentionally left blank.</p>
     </div>
 </template>

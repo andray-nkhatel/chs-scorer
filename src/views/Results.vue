@@ -9,6 +9,13 @@ import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 import apiClient from '../service/api.service';
 
+import { computed } from 'vue';
+import { useStore } from 'vuex';
+
+const store = useStore();
+const isAdmin = computed(() => store.getters['auth/hasRole']('Admin'));
+
+
 const toast = useToast();
 const results = ref([]);
 const loading = ref(true);
@@ -320,10 +327,15 @@ const exportCSV = () => {
 
 // Load data on component mount
 onMounted(() => {
+
   fetchResults();
   loadParticipants();
   loadEvents();
   loadCategories();
+
+
+   
+  
 });
 </script>
 
@@ -337,7 +349,7 @@ onMounted(() => {
       <!-- Toolbar -->
       <div class="flex justify-between items-center mb-4">
         <Button label="New" icon="pi pi-plus" class="p-button-success mr-2" @click="openNew" />
-        <Button label="Export" icon="pi pi-upload" class="p-button-help" @click="exportCSV" />
+        <Button v-if="isAdmin" label="Export" icon="pi pi-upload" class="p-button-help" @click="exportCSV" />
       </div>
       
       <!-- Data Table -->
@@ -460,8 +472,10 @@ onMounted(() => {
         <span v-if="result">Are you sure you want to delete the result for <b>{{ result.participantName }}</b> in <b>{{ result.eventName }}</b>?</span>
       </div>
       <template #footer>
-        <Button label="No" icon="pi pi-times" class="p-button-text" @click="deleteResultDialog = false" />
-        <Button label="Yes" icon="pi pi-check" class="p-button-text" @click="deleteResult" />
+       
+          <Button  label="No" icon="pi pi-times" class="p-button-text" @click="deleteResultDialog = false" />
+          <Button label="Yes" icon="pi pi-check" class="p-button-text" @click="deleteResult" />
+       
       </template>
     </Dialog>
   </div>
