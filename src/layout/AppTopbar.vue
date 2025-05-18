@@ -1,8 +1,39 @@
 <script setup>
 import { useLayout } from '@/layout/composables/layout';
-import AppConfigurator from './AppConfigurator.vue';
 
 const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
+
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
+
+const store = useStore();
+const router = useRouter();
+
+
+// Get user info from store
+const userName = computed(() => store.getters['auth/currentUser']?.userName || '');
+const userEmail = computed(() => store.getters['auth/currentUser']?.email || '');
+const isAuthenticated = computed(() => store.getters['auth/isAuthenticated']);
+
+
+// Logout function
+// Improved logout function
+const logout = async () => {
+  try {
+    console.log('Logging out...');
+    await store.dispatch('auth/logout');
+    console.log('Logout successful, redirecting to login page');
+    router.push('/auth/login');
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Even if there's an error, still try to redirect to login
+    router.push('/auth/login');
+  }
+};
+
+
+
 </script>
 
 <template>
@@ -30,16 +61,22 @@ const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
                     </g>
                 </svg>
 
-                <span>SAKAI</span>
+                <span>CHS SCORER</span>
             </router-link>
         </div>
+
+             <!-- Username in the middle with flex -->
+             <div v-if="isAuthenticated" class="username-container">
+            <span class="username-display">{{ userEmail.split("@")[0] }}</span>
+            </div>
+  
 
         <div class="layout-topbar-actions">
             <div class="layout-config-menu">
                 <button type="button" class="layout-topbar-action" @click="toggleDarkMode">
                     <i :class="['pi', { 'pi-moon': isDarkTheme, 'pi-sun': !isDarkTheme }]"></i>
                 </button>
-                <div class="relative">
+                <!-- <div class="relative">
                     <button
                         v-styleclass="{ selector: '@next', enterFromClass: 'hidden', enterActiveClass: 'animate-scalein', leaveToClass: 'hidden', leaveActiveClass: 'animate-fadeout', hideOnOutsideClick: true }"
                         type="button"
@@ -48,7 +85,7 @@ const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
                         <i class="pi pi-palette"></i>
                     </button>
                     <AppConfigurator />
-                </div>
+                </div> -->
             </div>
 
             <button
@@ -58,22 +95,51 @@ const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
                 <i class="pi pi-ellipsis-v"></i>
             </button>
 
-            <div class="layout-topbar-menu hidden lg:block">
-                <div class="layout-topbar-menu-content">
-                    <button type="button" class="layout-topbar-action">
-                        <i class="pi pi-calendar"></i>
-                        <span>Calendar</span>
-                    </button>
-                    <button type="button" class="layout-topbar-action">
-                        <i class="pi pi-inbox"></i>
-                        <span>Messages</span>
-                    </button>
-                    <button type="button" class="layout-topbar-action">
-                        <i class="pi pi-user"></i>
-                        <span>Profile</span>
-                    </button>
+       
+
+            <div class="layout-topbar-menu-dropdown">
+                    <div class="layout-topbar-menu-content">
+                        <!-- <button type="button" class="layout-topbar-action">
+                            <i class="pi pi-user"></i>
+                            <span>Profile</span>
+                        </button>
+                        <button type="button" class="layout-topbar-action">
+                            <i class="pi pi-cog"></i>
+                            <span>Settings</span>
+                        </button> -->
+                        <button type="button" class="layout-topbar-action" @click="logout">
+                            <i class="pi pi-sign-out"></i>
+                            <span>Logout</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
         </div>
     </div>
+  
 </template>
+
+
+<style scoped>
+  .username-container {
+    display: flex;
+    align-items: center; /* Vertically centers the username */
+    justify-content: flex-end;
+    flex-grow: 1; /* Takes available space between logo and actions */
+}
+
+.username-display {
+    font-weight: 500;
+    padding: 0 10px;
+}
+
+.username-display {
+    font-weight: 500;
+    padding: 0 10px;
+}
+
+
+.layout-topbar-logo-container, 
+.layout-topbar-actions {
+    flex-shrink: 0;}
+
+</style>
