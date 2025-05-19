@@ -5,6 +5,7 @@ import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
+import ResultsTableComponent from '../components/Results/ResultsTableComponent.vue';
 import apiClient from '../service/api.service';
 
 const toast = useToast();
@@ -40,7 +41,10 @@ const fetchLeaderboard = () => {
 // Prepare chart data
 const prepareChartData = () => {
   // Sort houses by points for the chart (highest first)
-  const sortedHouses = [...houses.value].sort((a, b) => b.totalPoints - a.totalPoints);
+  //const sortedHouses = [...houses.value].sort((a, b) => b.totalPoints - a.totalPoints);
+   // Sort houses by points for the chart (lowest first for "low score wins" system)
+   const sortedHouses = [...houses.value].sort((a, b) => a.totalPoints - b.totalPoints);
+  
   
   chartData.value = {
     labels: sortedHouses.map(house => house.houseName),
@@ -172,6 +176,60 @@ const getMedalEmoji = (rank) => {
   }
 };
 
+// Helper function to determine if a house has the lowest points
+const isLowestPoints = (house, allHouses) => {
+  const lowestPoints = Math.min(...allHouses.map(h => h.totalPoints));
+  return house.totalPoints === lowestPoints;
+};
+
+// Helper function to determine if a house has the second lowest points
+const isSecondLowestPoints = (house, allHouses) => {
+  const sortedHouses = [...allHouses].sort((a, b) => a.totalPoints - b.totalPoints);
+  // Filter to unique point values to handle ties
+  const uniquePoints = [...new Set(sortedHouses.map(h => h.totalPoints))];
+  return uniquePoints.length > 1 && house.totalPoints === uniquePoints[1];
+};
+
+// Helper function to determine if a house has the third lowest points
+const isThirdLowestPoints = (house, allHouses) => {
+  const sortedHouses = [...allHouses].sort((a, b) => a.totalPoints - b.totalPoints);
+  // Filter to unique point values to handle ties
+  const uniquePoints = [...new Set(sortedHouses.map(h => h.totalPoints))];
+  return uniquePoints.length > 2 && house.totalPoints === uniquePoints[2];
+};
+
+const getCorrectMedalByPoints = (house, allHouses) => {
+  // Sort houses by points (lowest first)
+  const uniquePointsSorted = [...new Set(allHouses.map(h => h.totalPoints))].sort((a, b) => a - b);
+  
+  // Find position of the house's points in the sorted unique points array
+  const position = uniquePointsSorted.indexOf(house.totalPoints);
+  
+  // Assign medal based on position
+  switch (position) {
+    case 0: return '🥇'; // Lowest points gets gold
+    case 1: return '🥈'; // Second lowest gets silver
+    case 2: return '🥉'; // Third lowest gets bronze
+    default: return position + 1; // Numerical rank
+  }
+};
+// Helper to assign medals based on lowest score when ranks are incorrectly assigned
+const getLowestScoreMedal = (currentHouse, topHouses) => {
+  // Sort houses by points (ascending - lowest first)
+  const sortedByLowestPoints = [...topHouses].sort((a, b) => a.totalPoints - b.totalPoints);
+  
+  // Find the index of the current house in the sorted array
+  const index = sortedByLowestPoints.findIndex(h => h.houseId === currentHouse.houseId);
+  
+  // Assign medals based on the corrected position
+  switch (index) {
+    case 0: return '🥇'; // Lowest score gets gold
+    case 1: return '🥈'; // Second lowest gets silver
+    case 2: return '🥉'; // Third lowest gets bronze
+    default: return currentHouse.rank; // Fallback
+  }
+};
+
 // Load data on component mount
 onMounted(() => {
   fetchLeaderboard();
@@ -184,42 +242,45 @@ onMounted(() => {
     
     <div class="card">
       <div class="flex justify-between items-center mb-4">
-        <h1 class="text-2xl font-bold">House Leaderboard</h1>
-        <div>
+        <h1 class="text-2xl font-bold mr-3">House Leaderboard</h1>
+        <div class="flex items-center justify-center ">
           <Button icon="pi pi-refresh" class="p-button-outlined mr-2" @click="refreshLeaderboard" />
           <Button label="Export" icon="pi pi-upload" class="p-button-help" @click="exportCSV" />
         </div>
       </div>
       
       <!-- Top Houses Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" v-if="houses.length > 0 && !loading">
-        <div v-for="house in houses.filter(h => h.rank <= 3).sort((a, b) => a.rank - b.rank)" :key="house.houseId"
-          class="podium-card p-4 rounded-lg shadow-md" 
-          :style="{ backgroundColor: house.color ? house.color + '20' : getDefaultColor(house.houseName) + '20', 
-                   borderLeft: '4px solid ' + (house.color || getDefaultColor(house.houseName)) }">
-          <div class="flex items-center">
-            <div class="rank-badge" :class="`rank-${house.rank}`">
-              {{ house.rank === 1 ? '🥇' : house.rank === 2 ? '🥈' : '🥉' }}
-            </div>
-            <div class="ml-4">
-              <h2 class="text-xl font-bold">{{ house.houseName }}</h2>
-              <p class="text-2xl font-bold mt-1">{{ house.totalPoints }} points</p>
-            </div>
+      <!-- Since the ranks are inverted (high points = rank 1), let's invert the medal display -->
+      <div v-for="house in houses.filter(h => h.rank <= 3).sort((a, b) => a.rank - b.rank)" :key="house.houseId"
+        class="podium-card p-4 rounded-lg shadow-md mb-4" 
+        :style="{ backgroundColor: house.color ? house.color + '20' : getDefaultColor(house.houseName) + '20', 
+                 borderLeft: '4px solid ' + (house.color || getDefaultColor(house.houseName)) }">
+        <div class="flex items-center">
+          <!-- Inverting the medal assignment to show the house with the lowest points as gold -->
+          <div class="rank-badge" :class="`rank-${house.rank}`">
+            <!-- If lowest points should win but ranks are backward, assign medals based on points -->
+            {{ getLowestScoreMedal(house, houses.filter(h => h.rank <= 3)) }}
+          </div>
+          <div class="ml-4">
+            <h2 class="text-xl font-bold">{{ house.houseName }}</h2>
+            <p class="text-2xl font-bold mt-1">{{ house.totalPoints }} points</p>
+            <small class="text-gray-500">(lower is better)</small>
           </div>
         </div>
       </div>
-      
+
+
       <!-- Chart -->
-      <div class="mb-6" v-if="chartData && !loading" style="height: 300px;">
+      <div class="mt-6" v-if="chartData && !loading" style="height: 150px;">
         <Chart type="bar" :data="chartData" :options="chartOptions" />
       </div>
       
       <!-- Data Table -->
       <DataTable 
-        :value="houses" 
+        :value="houses"
         dataKey="houseId"
         :paginator="true" 
-        :rows="10"
+        :rows="3"
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
         currentPageReportTemplate="Showing {first} to {last} of {totalRecords} houses"
         responsiveLayout="scroll"
@@ -227,6 +288,10 @@ onMounted(() => {
         stripedRows
         :filters="null"
         class="p-datatable-sm"
+        :showGridlines="true"
+        :globalFilterFields="['houseName', 'totalPoints']"
+        :sortField="'totalPoints'"
+        :sortOrder="1"  
       >
         <template #empty>
           <div class="text-center p-4" v-if="!loading && !error">
@@ -237,33 +302,53 @@ onMounted(() => {
           </div>
         </template>
         
-        <Column field="rank" header="Rank" sortable style="width: 6rem">
+        <Column field="rank" header="" sortable style="width:1rem; text-align: center;">
+          <template #header>
+            <div class="text-center w-full">Rank</div>
+          </template>
+  
+          <template #body="slotProps">
+          <div class="flex justify-center items-center">
+          <!-- Determine ranking position based on points (lowest first) -->
+          <span class="rank-number" :class="{
+            'rank-1': isLowestPoints(slotProps.data, houses),
+            'rank-2': isSecondLowestPoints(slotProps.data, houses),
+            'rank-3': isThirdLowestPoints(slotProps.data, houses)
+          }">
+        {{ getCorrectMedalByPoints(slotProps.data, houses) }}
+          </span>
+        </div>
+        </template>
+
+        </Column>
+        <Column field="houseName" header="" sortable style="width:1rem; text-align: center;">
+          <template #header>
+            <div class="flex text-center justify-center w-full">House</div>
+          </template>
           <template #body="slotProps">
             <div class="flex justify-center items-center">
-              <span class="rank-number" :class="{ 
-                'rank-1': slotProps.data.rank === 1,
-                'rank-2': slotProps.data.rank === 2,
-                'rank-3': slotProps.data.rank === 3
-              }">
-                {{ getMedalEmoji(slotProps.data.rank) }}
-              </span>
-            </div>
-          </template>
-        </Column>
-        <Column field="houseName" header="House" sortable style="min-width: 12rem">
-          <template #body="slotProps">
-            <div class="flex items-center">
               <div class="color-dot mr-2" :style="{ backgroundColor: slotProps.data.color || getDefaultColor(slotProps.data.houseName) }"></div>
               <span>{{ slotProps.data.houseName }}</span>
             </div>
           </template>
         </Column>
-        <Column field="totalPoints" header="Total Points" sortable style="width: 10rem">
+
+
+        <Column field="totalPoints" header="" sortable style="width: 1rem; text-align: center;">
+          <template #header>
+            <div class="text-center w-full">Total Points</div>
+          </template>
           <template #body="slotProps">
             <div class="font-bold">{{ slotProps.data.totalPoints }}</div>
           </template>
         </Column>
       </DataTable>
+
+        <!-- Recent Results Section -->
+        <div class="mt-8">
+        <h2 class="text-xl font-bold mb-4">Recent Results</h2>
+        <ResultsTableComponent />
+      </div>
     </div>
   </div>
 </template>
