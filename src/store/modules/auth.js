@@ -1,4 +1,3 @@
-import router from '@/router';
 import apiClient from '@/service/api.service';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
@@ -23,7 +22,9 @@ const state = {
   roles: JSON.parse(localStorage.getItem('roles')) || [],
   permissions: JSON.parse(localStorage.getItem('permissions')) || [],
   isRefreshing: false,
-  refreshSubscribers: []
+  refreshSubscribers: [],
+  requestInterceptor: null, 
+  responseInterceptor: null  
 };
 
 const getters = {
@@ -53,58 +54,61 @@ const getters = {
 
 const actions = {
   // Login action
-  async login({ commit, dispatch }, credentials) {
-    try {
-      const response = await apiClient.post('/auth/login', credentials);
-      
-      // Extract data from response to match your API format
-      const { 
-        token, 
-        refreshToken, 
-        userName, 
-        email, 
-        roles 
-      } = response.data;
-      
-      // Create user object
-      const user = {
-        id: getUserIdFromToken(token),
-        userName,
-        email
-      };
-      
-      // Save auth data with the correct format
-      commit('SET_AUTH_DATA', { 
-        token, 
-        refreshToken, 
-        user, 
-        roles,
-        permissions: [] 
-      });
-      
-      // Setup interceptors after successful login
-      dispatch('setupInterceptors');
-
-      console.log('User has Official role, redirecting to participants page');
+  // Login action
+// Login action
+async login({ commit, dispatch }, credentials) {
+  try {
+    const response = await apiClient.post('/auth/login', credentials);
     
-      // Add a small delay to ensure state is updated before navigation
-      setTimeout(() => {
-        if (roles.includes('Official')) {
-          router.push('/participants');
-        } else {
-          router.push('/');
-        }
-      }, 100);
-      
-       // Setup auth token for future requests
-       //setupAuthToken(token);
-
-      return response;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+    // Extract data from response to match your API format
+    const { 
+      token, 
+      refreshToken, 
+      userName, 
+      email, 
+      roles 
+    } = response.data;
+    
+    // Validate we received required auth data
+    if (!token || !refreshToken) {
+      throw new Error('Invalid authentication response');
     }
-  },
+    
+    // Create user object
+    const user = {
+      id: getUserIdFromToken(token),
+      userName,
+      email
+    };
+    
+    // Save auth data with the correct format
+    commit('SET_AUTH_DATA', { 
+      token, 
+      refreshToken, 
+      user, 
+      roles,
+      permissions: [] 
+    });
+    
+    // Setup interceptors only after successful login
+    dispatch('setupInterceptors');
+
+    console.log('Login successful');
+    
+    // Navigation happens in the component, not here
+    // Let the component handle redirect
+    
+    return response;
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    // Ensure auth data is cleared on failed login
+    commit('CLEAR_AUTH_DATA');
+    
+    // Rethrow the error to be handled by the component
+    throw error;
+  }
+},
 
   
   
@@ -193,8 +197,12 @@ const actions = {
   
   // Setup axios interceptors
   setupInterceptors({ commit, dispatch, state }) {
-    // Request interceptor
-    axios.interceptors.request.use(
+    // Remove existing interceptors
+    axios.interceptors.request.eject(state.requestInterceptor);
+    axios.interceptors.response.eject(state.responseInterceptor);
+    
+    // Add new request interceptor and store its reference
+    state.requestInterceptor = axios.interceptors.request.use(
       async config => {
         // Skip auth header for auth endpoints
         if (config.url.includes('/auth/login') || 
@@ -217,11 +225,17 @@ const actions = {
       }
     );
     
-    // Response interceptor
-    axios.interceptors.response.use(
+    // Add new response interceptor and store its reference
+    state.responseInterceptor = axios.interceptors.response.use(
       response => response,
       async error => {
         const originalRequest = error.config;
+        
+        // Don't try to refresh for login/register requests
+        if (originalRequest.url.includes('/auth/login') || 
+            originalRequest.url.includes('/auth/register')) {
+          return Promise.reject(error);
+        }
         
         // If error is not 401 or request has already been retried, reject
         if (error.response?.status !== 401 || originalRequest._retry) {

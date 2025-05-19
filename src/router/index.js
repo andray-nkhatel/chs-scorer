@@ -11,6 +11,12 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Login.vue')
         },
         {
+            path: '/auth/register',
+            name: 'register',
+            component: () => import('@/views/pages/auth/Register.vue')
+        },
+        
+        {
             path: '/',
             component: AppLayout,
             children: [
@@ -62,14 +68,14 @@ const router = createRouter({
                     },
                     component: () => import('@/views/Results.vue')
                 },
-                {
-                    path: '/leaderboard',
-                    name : 'leaderboard',
-                    meta:{
-                        requiresAuth: true,
-                    },
-                    component: () => import('@/views/Leaderboard.vue')
-                }
+                 {
+                     path: '/leaderboard',
+                     name : 'leaderboard',
+                     meta:{
+                         requiresAuth: true,
+                     },
+                     component: () => import('@/views/Leaderboard.vue')
+                 }
 
                 
         ]

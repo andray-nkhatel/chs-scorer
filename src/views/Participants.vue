@@ -4,6 +4,7 @@ import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
+import FileUpload from 'primevue/fileupload'; // Add this import
 import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import { useToast } from 'primevue/usetoast';
@@ -14,10 +15,14 @@ const toast = useToast();
 const participants = ref([]);
 const loading = ref(true);
 const error = ref(null);
+const fileUploadRef = ref(null); // Reference to the file upload component
 
 // Dialog states for add/edit functionality
 const participantDialog = ref(false);
 const deleteParticipantDialog = ref(false);
+const bulkImportDialog = ref(false); // New dialog for import status
+const importResults = ref(null); // To store import results
+const importLoading = ref(false); // Track import progress
 const participant = ref({
   id: null,
   fullName: '',
@@ -78,6 +83,84 @@ const openNew = () => {
   submitted.value = false;
   participantDialog.value = true;
   editMode.value = false;
+};
+
+// Handle bulk import of participants
+const importParticipants = () => {
+  if (!fileUploadRef.value || !fileUploadRef.value.files || fileUploadRef.value.files.length === 0) {
+    toast.add({ severity: 'warn', summary: 'Warning', detail: 'Please select a file to import', life: 3000 });
+    return;
+  }
+
+  const file = fileUploadRef.value.files[0];
+  
+  // Check file type
+  const validTypes = [
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/csv'
+  ];
+  
+  if (!validTypes.includes(file.type)) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Invalid file type. Please upload Excel (.xls, .xlsx) or CSV files', 
+      life: 3000 
+    });
+    return;
+  }
+  
+  importLoading.value = true;
+  
+  // Create form data
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  // Send request to import endpoint
+  apiClient.post('/participants/import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+    .then(response => {
+      toast.add({ 
+        severity: 'success', 
+        summary: 'Success', 
+        detail: `Successfully imported ${response.data.successCount} participants`, 
+        life: 3000 
+      });
+      
+      importResults.value = response.data;
+      bulkImportDialog.value = true;
+      
+      // Refresh the participants list
+      fetchParticipants();
+      
+      // Reset file input
+      if (fileUploadRef.value) {
+        fileUploadRef.value.clear();
+      }
+    })
+    .catch(err => {
+      console.error('Error importing participants:', err);
+      
+      // Handle validation errors
+      if (err.response && err.response.data && err.response.data.errors) {
+        importResults.value = err.response.data;
+        bulkImportDialog.value = true;
+      } else {
+        toast.add({ 
+          severity: 'error', 
+          summary: 'Error', 
+          detail: 'Failed to import participants. Please check your file format.', 
+          life: 5000 
+        });
+      }
+    })
+    .finally(() => {
+      importLoading.value = false;
+    });
 };
 
 // Open dialog to edit participant
@@ -160,6 +243,27 @@ const deleteParticipant = () => {
     });
 };
 
+// Download template spreadsheet
+const downloadTemplate = () => {
+  // Create a template CSV file with headers
+  const headers = ['FullName', 'Age', 'Gender', 'HouseId'];
+  const csvContent = headers.join(',') + '\n' + 
+                     'John Doe,15,Male,1\n' +
+                     'Jane Smith,16,Female,2';
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'participants_template.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  toast.add({ severity: 'info', summary: 'Template', detail: 'Template spreadsheet downloaded', life: 3000 });
+};
+
 // Export to CSV
 const exportCSV = () => {
   // Using require instead of dynamic import to avoid TypeScript errors
@@ -208,8 +312,39 @@ onMounted(() => {
       <h1 class="text-2xl font-bold mb-4">Participants</h1>
       
       <!-- Toolbar -->
-      <div class="flex justify-between items-center mb-4">
-        <Button label="New" icon="pi pi-plus" class="p-button-success mr-2" @click="openNew" />
+      <div class="flex flex-wrap gap-2 mb-4 items-center">
+        <Button label="New" icon="pi pi-plus" class="p-button-success" @click="openNew" />
+        
+        <!-- File Upload section -->
+        <div class="flex-grow-1 flex items-center gap-2">
+          <span class="p-input-icon-right">
+            <FileUpload
+              ref="fileUploadRef"
+              mode="basic"
+              :multiple="false"
+              accept=".xlsx,.xls,.csv"
+              :auto="false"
+              chooseLabel="Choose Spreadsheet"
+              class="p-button-outlined"
+              :maxFileSize="10000000"
+            />
+          </span>
+          <Button 
+            label="Import" 
+            icon="pi pi-upload" 
+            class="p-button-primary" 
+            @click="importParticipants"
+            :loading="importLoading"
+          />
+          <Button 
+            label="Template" 
+            icon="pi pi-download" 
+            class="p-button-secondary p-button-outlined" 
+            @click="downloadTemplate"
+            title="Download a template spreadsheet with the correct format"
+          />
+        </div>
+        
         <Button label="Export" icon="pi pi-upload" class="p-button-help" @click="exportCSV" />
       </div>
       
@@ -288,6 +423,46 @@ onMounted(() => {
       <template #footer>
         <Button label="No" icon="pi pi-times" class="p-button-text" @click="deleteParticipantDialog = false" />
         <Button label="Yes" icon="pi pi-check" class="p-button-text" @click="deleteParticipant" />
+      </template>
+    </Dialog>
+    
+    <!-- Bulk Import Results Dialog -->
+    <Dialog v-model:visible="bulkImportDialog" :style="{width: '550px'}" :header="importResults?.success ? 'Import Successful' : 'Import Failed'" :modal="true">
+      <div v-if="importResults">
+        <div v-if="importResults.success" class="text-green-600 mb-4">
+          <i class="pi pi-check-circle mr-2" style="font-size: 1.5rem"></i>
+          <span class="font-bold">{{ importResults.message }}</span>
+        </div>
+        
+        <div v-else class="text-red-600 mb-4">
+          <i class="pi pi-times-circle mr-2" style="font-size: 1.5rem"></i>
+          <span class="font-bold">{{ importResults.message }}</span>
+        </div>
+        
+        <div v-if="importResults.successCount" class="mb-2">
+          Successfully imported: <span class="font-bold">{{ importResults.successCount }}</span> participants
+        </div>
+        
+        <div v-if="importResults.failureCount" class="mb-4">
+          Failed to import: <span class="font-bold">{{ importResults.failureCount }}</span> participants
+        </div>
+        
+        <!-- Error details if any -->
+        <div v-if="importResults.errors && importResults.errors.length > 0" class="mt-4">
+          <h3 class="text-lg font-bold mb-2">Validation Errors:</h3>
+          <div v-for="(error, index) in importResults.errors" :key="index" class="p-3 bg-red-50 rounded mb-2">
+            <div><span class="font-bold">Row {{ error.rowNumber }}:</span> {{ error.participant.fullName }}</div>
+            <ul class="list-disc pl-5 mt-1">
+              <li v-for="(errMsg, errIndex) in error.errors" :key="errIndex" class="text-red-600">
+                {{ errMsg }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <Button label="Close" icon="pi pi-times" class="p-button-text" @click="bulkImportDialog = false" />
       </template>
     </Dialog>
   </div>

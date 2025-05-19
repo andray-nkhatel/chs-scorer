@@ -14,17 +14,29 @@ const password = ref('');
 const checked = ref(false);
 const loading = ref(false);
 
+// Add a ref to track if the last login attempt failed
+const lastLoginFailed = ref(false);
+
+
+
+// In Login.vue
 const login = async () => {
   if (!email.value || !password.value) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Please enter email and password', life: 3000 });
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Please enter email and password', 
+      closable: true, 
+      sticky: true 
+    });
     return;
   }
   
+  // Make sure to set loading state at the beginning
   loading.value = true;
   
   try {
-    console.log('Attempting login with:', { email: email.value, password: password.value });
-    
+    lastLoginFailed.value = false;
     // Use 'auth/login' with namespaced store
     await store.dispatch('auth/login', {
       email: email.value,
@@ -35,66 +47,101 @@ const login = async () => {
     const redirectPath = router.currentRoute.value.query.redirect || '/';
     router.push(redirectPath);
     
-    toast.add({ severity: 'success', summary: 'Success', detail: 'Login successful', life: 3000 });
+    toast.add({ 
+      severity: 'success', 
+      summary: 'Success', 
+      detail: 'Login successful', 
+      life: 3000 
+    });
   } catch (error) {
+    lastLoginFailed.value = true;
     console.error('Login error:', error);
-    let errorMessage = 'Invalid credentials';
     
-    if (error.response?.data?.message) {
-      errorMessage = error.response.data.message;
+    // Check specifically for 401 status code
+    if (error.response && error.response.status === 401) {
+      // Show "Invalid user" for 401 unauthorized errors
+      toast.add({
+        severity: 'error',
+        summary: 'Login Failed',
+        detail: 'Invalid user. Please check your credentials.',
+        life: 5000,
+        closable: true,
+        sticky: true,
+        // Add a unique ID for each toast
+      id: new Date().getTime().toString()
+      });
+    } else {
+      // For all other errors, use existing error handling
+      let errorMessage = 'Invalid credentials';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        if (error.message.includes('No refresh token available')) {
+          errorMessage = 'Authentication failed. Please try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.add({
+        severity: 'error',
+        summary: 'Login Failed',
+        detail: errorMessage,
+        life: 5000,
+        closable: true,
+        sticky: true
+      });
     }
     
-    toast.add({ severity: 'error', summary: 'Error', detail: errorMessage, life: 3000 });
+    // Reset password field for security
+    password.value = '';
   } finally {
+    // CRITICAL: Ensure loading state is reset in the finally block
+    // This ensures it's reset whether the request succeeds or fails
+    setTimeout(() => {
     loading.value = false;
+  }, 300);
+    // loading.value = false;
   }
 };
 
-const forgotPassword = () => {
+const registerNavigation = () => {
   // Implement forgot password functionality
-  router.push('/forgot-password');
+  router.push('/auth/register');
 };
 </script>
-
 <template>
-    <FloatingConfigurator />
-    <div class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden">
-        <div class="flex flex-col items-center justify-center">
-            <div style="border-radius: 56px; padding: 0.3rem; background: linear-gradient(180deg, var(--primary-color) 10%, rgba(33, 150, 243, 0) 30%)">
-                <div class="w-full bg-surface-0 dark:bg-surface-900 py-20 px-8 sm:px-20" style="border-radius: 53px">
-                    <div class="text-center mb-8">
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome to C.H.S Scorer</div>
-                        <span class="text-muted-color font-medium">Sign in to continue</span>
-                    </div>
-                <form @submit.prevent="login">
-                    <div>
-                        <label for="email1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Email</label>
-                        <InputText id="email1" type="text" placeholder="Email address" class="w-full md:w-[30rem] mb-8" v-model="email" />
-
-                        <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
-                        <Password id="password1" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
-
-                        <div class="flex items-center justify-between mt-2 mb-8 gap-8">
-                            <div class="flex items-center">
-                                <Checkbox v-model="checked" id="rememberme1" binary class="mr-2"></Checkbox>
-                                <label for="rememberme1">Remember me</label>
-                            </div>
-                            <span @click="forgotPassword" class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Forgot password?</span>
-                        </div>
-                        <Button type="submit" label="Sign In" class="w-full" :loading="loading"></Button>
-                    </div>
-                </form>
-                </div>
-            
-            </div>
+  <Toast position="top-center" />
+  <FloatingConfigurator />
+  <div class="bg-surface-200 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden">
+    <div class="flex flex-col items-center justify-center">
+      <!-- Removed all background styling, keeping only padding and border radius -->
+      <div class="w-full py-20 px-8 sm:px-20" style="border-radius: 53px">
+        <div class="text-center mb-8">
+          <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome to C.H.S Scorer</div>
+          <span class="text-muted-color font-medium">Sign in to continue</span>
         </div>
+        <form @submit.prevent="login">
+          <div>
+            <label for="email1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Email</label>
+            <InputText id="email1" type="text" placeholder="Email address" class="w-full md:w-[30rem] mb-8" v-model="email" />
+            <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
+            <Password id="password1" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
+            <div class="flex items-center justify-end mt-2 mb-8 gap-8">
+              <!-- <div class="flex items-center">
+                <Checkbox v-model="checked" id="rememberme1" binary class="mr-2"></Checkbox>
+                <label for="rememberme1">Remember me</label>
+              </div> -->
+              <span @click="registerNavigation" class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Register</span>
+            </div>
+            <Button type="submit" label="Sign In" class="w-full" :loading="loading"></Button>
+          </div>
+        </form>
+      </div>
     </div>
+  </div>
 </template>
-
-
-
-
-
 
 
 

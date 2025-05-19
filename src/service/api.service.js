@@ -39,8 +39,10 @@ const refreshToken = async () => {
   
   try {
     const refreshToken = localStorage.getItem('refreshToken');
+    
     if (!refreshToken) {
-      throw new Error('No refresh token available');
+      // Return a rejected promise with a more descriptive error
+      return Promise.reject(new Error('Authentication failed: No refresh token available'));
     }
     
     const response = await axios.post(
@@ -65,6 +67,28 @@ const refreshToken = async () => {
     window.location.href = '/login';
     return Promise.reject(error);
   }
+};
+
+// Define a proper post method for the apiClient
+const originalPost = apiClient.post;
+apiClient.post = function(url, data, config = {}) {
+  console.log('Request URL:', url);
+  console.log('Full request URL:', this.defaults.baseURL + url);
+  console.log('Request headers:', this.defaults.headers);
+  console.log('Request data:', data);
+  
+  // Skip refresh token logic for auth endpoints
+  if (url.includes('/auth/login') || url.includes('/auth/register')) {
+    return originalPost.call(this, url, data, config)
+      .catch(error => {
+        console.error('Login/register error:', error);
+        // Don't attempt to refresh token for auth endpoints
+        throw error;
+      });
+  }
+  
+  // Standard handling for other endpoints
+  return originalPost.call(this, url, data, config);
 };
 
 // Add request interceptor with detailed logging
@@ -105,6 +129,12 @@ apiClient.interceptors.response.use(
       console.error('Error headers:', error.response.headers);
       console.error('Error data:', error.response.data);
       
+      // Skip token refresh for login/register endpoints
+      if (originalRequest.url.includes('/auth/login') || 
+          originalRequest.url.includes('/auth/register')) {
+        return Promise.reject(error);
+      }
+      
       // If the error is 401 Unauthorized and the request hasn't been retried yet
       if (error.response.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
@@ -120,6 +150,7 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         } catch (refreshError) {
           // If token refresh fails, reject with the refresh error
+          console.error('Token refresh failed:', refreshError);
           return Promise.reject(refreshError);
         }
       }

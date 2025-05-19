@@ -1,4 +1,5 @@
 <script setup>
+import AutoComplete from 'primevue/autocomplete';
 import Button from 'primevue/button';
 import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
@@ -14,8 +15,9 @@ import { useStore } from 'vuex';
 
 const store = useStore();
 const isAdmin = computed(() => store.getters['auth/hasRole']('Admin'));
-
-
+// Add this to your ref declarations
+const selectedParticipant = ref(null);
+const filteredParticipants = ref([]);
 const toast = useToast();
 const results = ref([]);
 const loading = ref(true);
@@ -115,7 +117,7 @@ const fetchResults = () => {
     });
 };
 
-// Open dialog to add new result
+// Update openNew to reset the selectedParticipant
 const openNew = () => {
   result.value = {
     id: null,
@@ -128,14 +130,17 @@ const openNew = () => {
     categoryId: null,   
     categoryName: '',   
   };
+  selectedParticipant.value = null;
   submitted.value = false;
   resultDialog.value = true;
   editMode.value = false;
 };
 
-// Open dialog to edit result
+// Update editResult to set the selectedParticipant
 const editResult = (editResult) => {
   result.value = { ...editResult };
+  // Find the participant object for the selected ID
+  selectedParticipant.value = participants.value.find(p => p.value === editResult.participantId) || null;
   resultDialog.value = true;
   editMode.value = true;
 };
@@ -291,6 +296,20 @@ const deleteResult = () => {
     });
 };
 
+const searchParticipants = (event) => {
+  const query = event.query.toLowerCase();
+  filteredParticipants.value = participants.value.filter(
+    participant => participant.label.toLowerCase().includes(query)
+  );
+};
+
+const onParticipantSelect = (event) => {
+  // Set the participantId from the selected participant object
+  result.value.participantId = event.value.value;
+  result.value.participantName = event.value.name;
+};
+
+
 // Export to CSV
 const exportCSV = () => {
   // Simple CSV export function
@@ -410,61 +429,75 @@ onMounted(() => {
       </DataTable>
     </div>
     
-    <!-- Add/Edit Result Dialog -->
-    <Dialog v-model:visible="resultDialog" :style="{width: '450px'}" header="Result Details" :modal="true" class="p-fluid">
-      <div class="field">
-        <label for="participant">Participant</label>
-        <Dropdown id="participant" v-model="result.participantId" class="w-full" :options="participants" optionLabel="label" optionValue="value" 
-          placeholder="Select a Participant" :class="{'p-invalid': submitted && !result.participantId}"
-          @change="onParticipantChange" />
-        <small class="p-error" v-if="submitted && !result.participantId">Participant is required.</small>
-      </div>
-      
-      <div class="field">
-        <label for="event">Event</label>
-        <Dropdown id="event" v-model="result.eventId" :options="events" class="w-full" optionLabel="label" optionValue="value" 
-          placeholder="Select an Event" :class="{'p-invalid': submitted && !result.eventId}"
-          @change="onEventChange" />
-        <small class="p-error" v-if="submitted && !result.eventId">Event is required.</small>
-      </div>
-
-      <div class="field">
-            <label for="category">Category</label>
-            <Dropdown 
-            id="category" 
-            v-model="result.categoryId" 
-            :options="categories" 
-            class="w-full" 
-            optionLabel="label" 
-            optionValue="value"
-            placeholder="Select a Category" 
-            :class="{'p-invalid': submitted && !result.categoryId}"
-            @change="onCategoryChange" />
-            <small class="p-error" v-if="submitted && !result.categoryId">Category is required.</small>
-     </div>
-      
-      <div class="field">
-        <label for="position">Position</label>
-        <InputNumber id="position" v-model="result.position" class="w-full" :min="1" :max="100" showButtons
-          :class="{'p-invalid': submitted && (!result.position || result.position < 1)}"
-          @change="calculatePoints" />
-        <small class="p-error" v-if="submitted && (!result.position || result.position < 1)">
-          Position is required and must be a positive number.
-        </small>
-      </div>
-      
-      <div class="field">
-        <label for="points">Points</label>
-        <InputNumber id="points" v-model="result.points" :min="0" class="w-full" showButtons />
-        <small class="text-gray-500">Points will be calculated automatically based on position, but can be overridden.</small>
-      </div>
-      
-      <template #footer>
-        <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="hideDialog" />
-        <Button label="Save" icon="pi pi-check" class="p-button-text" @click="saveResult" />
-      </template>
-    </Dialog>
-    
+<!-- Add/Edit Result Dialog -->
+<Dialog v-model:visible="resultDialog" :style="{width: '450px'}" header="Result Details" :modal="true" class="p-fluid">
+  <div class="field">
+    <label for="participant">Participant</label>
+    <AutoComplete
+      id="participant"
+      v-model="selectedParticipant"
+      :suggestions="filteredParticipants"
+      optionLabel="label"
+      placeholder="Search for a Participant"
+      class="w-full"
+      :class="{'p-invalid': submitted && !result.participantId}"
+      @complete="searchParticipants"
+      @item-select="onParticipantSelect"
+    />
+    <small class="p-error" v-if="submitted && !result.participantId">Participant is required.</small>
+  </div>
+  <div class="field">
+    <label for="event">Event</label>
+    <Dropdown
+      id="event"
+      v-model="result.eventId"
+      :options="events"
+      class="w-full"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Select an Event"
+      :class="{'p-invalid': submitted && !result.eventId}"
+      @change="onEventChange"
+    />
+    <small class="p-error" v-if="submitted && !result.eventId">Event is required.</small>
+  </div>
+  <div class="field">
+    <label for="category">Category</label>
+    <Dropdown
+      id="category"
+      v-model="result.categoryId"
+      :options="categories"
+      class="w-full"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Select a Category"
+      :class="{'p-invalid': submitted && !result.categoryId}"
+      @change="onCategoryChange"
+    />
+    <small class="p-error" v-if="submitted && !result.categoryId">Category is required.</small>
+  </div>
+  <div class="field">
+    <label for="position">Position</label>
+    <InputNumber
+      id="position"
+      v-model="result.position"
+      class="w-full"
+      :min="1"
+      :max="100"
+      showButtons
+      :class="{'p-invalid': submitted && (!result.position || result.position < 1)}"
+      @change="calculatePoints"
+    />
+    <small class="p-error" v-if="submitted && (!result.position || result.position < 1)">
+      Position is required and must be a positive number.
+    </small>
+  </div>
+  <!-- Points field is removed as requested -->
+  <template #footer>
+    <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="hideDialog" />
+    <Button label="Save" icon="pi pi-check" class="p-button-text" @click="saveResult" />
+  </template>
+</Dialog>
     <!-- Delete Result Dialog -->
     <Dialog v-model:visible="deleteResultDialog" :style="{width: '450px'}" header="Confirm" :modal="true">
       <div class="confirmation-content">
