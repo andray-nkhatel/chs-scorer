@@ -13,6 +13,7 @@ const email = ref('');
 const password = ref('');
 const checked = ref(false);
 const loading = ref(false);
+let isEnabled = ref(false);
 
 // Add a ref to track if the last login attempt failed
 const lastLoginFailed = ref(false);
@@ -42,21 +43,27 @@ const login = async () => {
       email: email.value,
       password: password.value
     });
+
+    isEnabled = true;
     
     // Get redirect path or go to dashboard
     const redirectPath = router.currentRoute.value.query.redirect || '/';
-    router.push(redirectPath);
+
+    setTimeout(() => {
+      router.push(redirectPath);
+    }, 2000);
     
-    toast.add({ 
-      severity: 'success', 
-      summary: 'Success', 
-      detail: 'Login successful', 
-      life: 3000 
-    });
+    
+    // toast.add({ 
+    //   severity: 'success', 
+    //   summary: 'Success', 
+    //   detail: 'Login successful', 
+    //   life: 3000 
+    // });
   } catch (error) {
     lastLoginFailed.value = true;
     console.error('Login error:', error);
-    
+    isEnabled = false;
     // Check specifically for 401 status code
     if (error.response && error.response.status === 401) {
       // Show "Invalid user" for 401 unauthorized errors
@@ -118,7 +125,10 @@ const registerNavigation = () => {
     <div class="flex flex-col items-center justify-center">
       <!-- Removed all background styling, keeping only padding and border radius -->
       <div class="w-full py-20 px-8 sm:px-20" style="border-radius: 53px">
+        <Message v-if="isEnabled"  class="mb-6" severity="success" size="large">Login successful!</Message>
         <div class="text-center mb-8">
+          
+          <!-- <Message v-if="isEnabled" severity="success" icon="pi pi-times-circle" class="mb-2">Form is valid</Message> -->
           <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome to C.H.S Scorer</div>
           <span class="text-muted-color font-medium">Sign in to continue</span>
         </div>

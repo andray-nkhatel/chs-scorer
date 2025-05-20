@@ -54,8 +54,7 @@ const getters = {
 
 const actions = {
   // Login action
-  // Login action
-// Login action
+ 
 async login({ commit, dispatch }, credentials) {
   try {
     const response = await apiClient.post('/auth/login', credentials);
