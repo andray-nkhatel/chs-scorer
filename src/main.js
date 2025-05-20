@@ -1,3 +1,4 @@
+import '@/assets/styles.scss';
 import Aura from '@primeuix/themes/aura';
 import PrimeVue from 'primevue/config';
 import ConfirmationService from 'primevue/confirmationservice';
@@ -8,9 +9,27 @@ import RbacDirectives from './directives/rbac';
 import router from './router';
 import store from './store';
 
-import '@/assets/styles.scss';
+const CustomAura = {
+    ...Aura,  // Keep all original Aura theme properties
+  };
 
-
+ // Update the primary color mapping in the semantic section to use blue instead of emerald
+if (CustomAura.semantic && CustomAura.semantic.primary) {
+    // Change the primary color mapping from emerald to blue
+    CustomAura.semantic.primary = {
+      "50": "{blue.50}",
+      "100": "{blue.100}",
+      "200": "{blue.200}",
+      "300": "{blue.300}",
+      "400": "{blue.400}",
+      "500": "{blue.500}",
+      "600": "{blue.600}",
+      "700": "{blue.700}",
+      "800": "{blue.800}",
+      "900": "{blue.900}",
+      "950": "{blue.950}"
+    };
+  }
 
 const app = createApp(App);
 
@@ -23,7 +42,7 @@ app.use(RbacDirectives);
 app.use(router);
 app.use(PrimeVue, {
     theme: {
-        preset: Aura,
+        preset: CustomAura,
         options: {
             darkModeSelector: '.app-dark'
         }
