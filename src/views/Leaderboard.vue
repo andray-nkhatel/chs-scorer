@@ -4,7 +4,7 @@ import Chart from 'primevue/chart';
 import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import ResultsTableComponent from '../components/Results/ResultsTableComponent.vue';
 import apiClient from '../service/api.service';
 
@@ -14,6 +14,7 @@ const loading = ref(true);
 const error = ref(null);
 const chartData = ref(null);
 const chartOptions = ref(null);
+let pollingInterval = null;
 
 // Fetch leaderboard data
 const fetchLeaderboard = () => {
@@ -233,7 +234,14 @@ const getLowestScoreMedal = (currentHouse, topHouses) => {
 // Load data on component mount
 onMounted(() => {
   fetchLeaderboard();
+  pollingInterval = setInterval(fetchLeaderboard, 15000); 
 });
+
+onUnmounted(() => {
+  if(pollingInterval){
+    clearInterval(pollingInterval);
+  }
+})
 </script>
 
 <template>

@@ -2,7 +2,7 @@
 import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import apiClient from '../../service/api.service';
 
 const toast = useToast();
@@ -10,6 +10,7 @@ const results = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const selectedResults = ref(null);
+let pollingInterval = null;
 
 // Data for participant and event information
 const participants = ref([]);
@@ -87,6 +88,13 @@ onMounted(() => {
   fetchResults();
   loadParticipants();
   loadEvents();
+  pollingInterval = setInterval(fetchResults,15000);
+});
+
+onUnmounted(()=>{
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
 });
 </script>
 
@@ -135,6 +143,8 @@ onMounted(() => {
         <template #body="slotProps">
           <span>{{ getHouseNameForParticipant(slotProps.data.participantId) }}</span>
         </template>
+      </Column>
+      <Column field="eventName" header="Event" sortable style="width: 1em; text-align: center;">
       </Column>
       <Column field="categoryName" header="Category" sortable style="width: 1rem; text-align: center;">
         <template #body="slotProps">

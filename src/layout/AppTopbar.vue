@@ -96,10 +96,10 @@ const logout = async () => {
                             <i class="pi pi-cog"></i>
                             <span>Settings</span>
                         </button> -->
-                        <button type="button" class="layout-topbar-action" @click="logout">
+                        <!-- <button type="button" class="layout-topbar-action" @click="logout">
                             <i class="pi pi-sign-out"></i>
                             <span>Logout</span>
-                        </button>
+                        </button> -->
                     </div>
                 </div>
         </div>

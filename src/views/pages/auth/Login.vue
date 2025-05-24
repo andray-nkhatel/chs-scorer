@@ -10,6 +10,7 @@ const router = useRouter();
 const toast = useToast();
 
 const email = ref('');
+const userName = ref('');
 const password = ref('');
 const checked = ref(false);
 const loading = ref(false);
@@ -22,13 +23,13 @@ const lastLoginFailed = ref(false);
 
 // In Login.vue
 const login = async () => {
-  if (!email.value || !password.value) {
+  if (!userName.value || !password.value) {
     toast.add({ 
       severity: 'error', 
       summary: 'Error', 
-      detail: 'Please enter email and password', 
+      detail: 'Please username and password', 
       closable: true, 
-      sticky: true 
+      sticky: false 
     });
     return;
   }
@@ -40,7 +41,8 @@ const login = async () => {
     lastLoginFailed.value = false;
     // Use 'auth/login' with namespaced store
     await store.dispatch('auth/login', {
-      email: email.value,
+      userName: userName.value,
+      email: "",
       password: password.value
     });
 
@@ -71,7 +73,7 @@ const login = async () => {
         severity: 'error',
         summary: 'Login Failed',
         detail: 'Invalid user. Please check your credentials.',
-        life: 5000,
+        life: 1000,
         closable: true,
         sticky: true,
         // Add a unique ID for each toast
@@ -134,8 +136,8 @@ const registerNavigation = () => {
         </div>
         <form @submit.prevent="login">
           <div>
-            <label for="email1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Email</label>
-            <InputText id="email1" type="text" placeholder="Email address" class="w-full md:w-[30rem] mb-8" v-model="email" />
+            <label for="User1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Username</label>
+            <InputText id="username" type="text" placeholder="Username" class="w-full md:w-[30rem] mb-8" v-model="userName" />
             <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
             <Password id="password1" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
             <div class="flex items-center justify-end mt-2 mb-8 gap-8">
@@ -143,7 +145,7 @@ const registerNavigation = () => {
                 <Checkbox v-model="checked" id="rememberme1" binary class="mr-2"></Checkbox>
                 <label for="rememberme1">Remember me</label>
               </div> -->
-              <span @click="registerNavigation" class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Register</span>
+              <!-- <span @click="registerNavigation" class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Register</span> -->
             </div>
             <Button type="submit" label="Sign In" class="w-full" :loading="loading"></Button>
           </div>
