@@ -144,7 +144,10 @@ onUnmounted(()=>{
           <span>{{ getHouseNameForParticipant(slotProps.data.participantId) }}</span>
         </template>
       </Column>
-      <Column field="eventName" header="Event" sortable style="width: 1em; text-align: center;">
+      <Column field="eventName" header="" sortable style="min-width: none; text-align: center;">
+        <template #header>
+          <div class="flex text-center justify-center w-full">Event</div>
+        </template>
       </Column>
       <Column field="categoryName" header="Category" sortable style="width: 1rem; text-align: center;">
         <template #body="slotProps">
