@@ -234,7 +234,7 @@ const getLowestScoreMedal = (currentHouse, topHouses) => {
 // Load data on component mount
 onMounted(() => {
   fetchLeaderboard();
-  pollingInterval = setInterval(fetchLeaderboard, 15000); 
+  pollingInterval = setInterval(fetchLeaderboard, 60000); 
 });
 
 onUnmounted(() => {

@@ -1,28 +1,28 @@
+
 <script setup>
 import Button from 'primevue/button';
 import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
-import FileUpload from 'primevue/fileupload'; // Add this import
+import FileUpload from 'primevue/fileupload';
 import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import apiClient from '../service/api.service';
 
 const toast = useToast();
 const participants = ref([]);
 const loading = ref(true);
 const error = ref(null);
-const fileUploadRef = ref(null); // Reference to the file upload component
+const fileUploadRef = ref(null);
 
-// Dialog states for add/edit functionality
 const participantDialog = ref(false);
 const deleteParticipantDialog = ref(false);
-const bulkImportDialog = ref(false); // New dialog for import status
-const importResults = ref(null); // To store import results
-const importLoading = ref(false); // Track import progress
+const bulkImportDialog = ref(false);
+const importResults = ref(null);
+const importLoading = ref(false);
 const participant = ref({
   id: null,
   fullName: '',
@@ -35,26 +35,32 @@ const selectedParticipants = ref(null);
 const submitted = ref(false);
 const editMode = ref(false);
 
-// Gender options for dropdown
 const genderOptions = ref([
   { label: 'Male', value: 'Male' },
   { label: 'Female', value: 'Female' },
   { label: 'Other', value: 'Other' }
 ]);
 
-// Houses data for dropdown (you might want to fetch this from API)
 const houses = ref([
   { label: 'Kudu', value: 1, name: 'Kudu' },
   { label: 'Sable', value: 2, name: 'Sable' },
   { label: 'Eland', value: 3, name: 'Eland' },
-  
 ]);
 
-// Fetch participants data
+// --- Search functionality ---
+const searchTerm = ref('');
+const filteredParticipants = computed(() => {
+  if (!searchTerm.value.trim()) return participants.value;
+  return participants.value.filter(p =>
+    p.fullName &&
+    p.fullName.toLowerCase().includes(searchTerm.value.trim().toLowerCase())
+  );
+});
+// ----------------------------
+
 const fetchParticipants = () => {
   loading.value = true;
   error.value = null;
-  
   apiClient.get('/participants')
     .then(response => {
       participants.value = response.data;
@@ -70,7 +76,6 @@ const fetchParticipants = () => {
     });
 };
 
-// Open dialog to add new participant
 const openNew = () => {
   participant.value = {
     id: null,
@@ -85,22 +90,17 @@ const openNew = () => {
   editMode.value = false;
 };
 
-// Handle bulk import of participants
 const importParticipants = () => {
   if (!fileUploadRef.value || !fileUploadRef.value.files || fileUploadRef.value.files.length === 0) {
     toast.add({ severity: 'warn', summary: 'Warning', detail: 'Please select a file to import', life: 3000 });
     return;
   }
-
   const file = fileUploadRef.value.files[0];
-  
-  // Check file type
   const validTypes = [
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/csv'
   ];
-  
   if (!validTypes.includes(file.type)) {
     toast.add({ 
       severity: 'error', 
@@ -110,14 +110,9 @@ const importParticipants = () => {
     });
     return;
   }
-  
   importLoading.value = true;
-  
-  // Create form data
   const formData = new FormData();
   formData.append('file', file);
-  
-  // Send request to import endpoint
   apiClient.post('/participants/import', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -130,22 +125,15 @@ const importParticipants = () => {
         detail: `Successfully imported ${response.data.successCount} participants`, 
         life: 3000 
       });
-      
       importResults.value = response.data;
       bulkImportDialog.value = true;
-      
-      // Refresh the participants list
       fetchParticipants();
-      
-      // Reset file input
       if (fileUploadRef.value) {
         fileUploadRef.value.clear();
       }
     })
     .catch(err => {
       console.error('Error importing participants:', err);
-      
-      // Handle validation errors
       if (err.response && err.response.data && err.response.data.errors) {
         importResults.value = err.response.data;
         bulkImportDialog.value = true;
@@ -163,44 +151,35 @@ const importParticipants = () => {
     });
 };
 
-// Open dialog to edit participant
 const editParticipant = (editParticipant) => {
   participant.value = { ...editParticipant };
   participantDialog.value = true;
   editMode.value = true;
 };
 
-// Confirm participant deletion
 const confirmDeleteParticipant = (participantToDelete) => {
   participant.value = participantToDelete;
   deleteParticipantDialog.value = true;
 };
 
-// Hide the dialog
 const hideDialog = () => {
   participantDialog.value = false;
   submitted.value = false;
 };
 
-// Save participant (add or update)
 const saveParticipant = () => {
   submitted.value = true;
-  
   if (!participant.value.fullName?.trim()) {
     toast.add({ severity: 'warn', summary: 'Warning', detail: 'Name is required', life: 3000 });
     return;
   }
-  
-  // Set houseName based on selected houseId
   if (participant.value.houseId) {
     const selectedHouse = houses.value.find(h => h.value === participant.value.houseId);
     if (selectedHouse) {
       participant.value.houseName = selectedHouse.name;
     }
   }
-  
   if (editMode.value) {
-    // Update existing participant
     apiClient.put(`/participants/${participant.value.id}`, participant.value)
       .then(() => {
         toast.add({ severity: 'success', summary: 'Success', detail: 'Participant Updated', life: 3000 });
@@ -213,7 +192,6 @@ const saveParticipant = () => {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update participant', life: 3000 });
       });
   } else {
-    // Add new participant
     apiClient.post('/participants', participant.value)
       .then(() => {
         toast.add({ severity: 'success', summary: 'Success', detail: 'Participant Added', life: 3000 });
@@ -228,7 +206,6 @@ const saveParticipant = () => {
   }
 };
 
-// Delete participant
 const deleteParticipant = () => {
   apiClient.delete(`/participants/${participant.value.id}`)
     .then(() => {
@@ -243,14 +220,11 @@ const deleteParticipant = () => {
     });
 };
 
-// Download template spreadsheet
 const downloadTemplate = () => {
-  // Create a template CSV file with headers
   const headers = ['FullName', 'Age', 'Gender', 'HouseId'];
   const csvContent = headers.join(',') + '\n' + 
                      'John Doe,15,Male,1\n' +
                      'Jane Smith,16,Female,2';
-  
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
@@ -260,26 +234,19 @@ const downloadTemplate = () => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  
   toast.add({ severity: 'info', summary: 'Template', detail: 'Template spreadsheet downloaded', life: 3000 });
 };
 
-// Export to CSV
 const exportCSV = () => {
-  // Using require instead of dynamic import to avoid TypeScript errors
   const downloadCSV = () => {
     const csv = [
-      // CSV header
       Object.keys(participants.value[0] || {}).join(','),
-      // CSV rows
       ...participants.value.map(item => 
         Object.values(item).map(val => 
           typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
         ).join(',')
       )
     ].join('\n');
-    
-    // Create a blob and download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -290,7 +257,6 @@ const exportCSV = () => {
     link.click();
     document.body.removeChild(link);
   };
-  
   if (participants.value.length > 0) {
     downloadCSV();
   } else {
@@ -298,7 +264,6 @@ const exportCSV = () => {
   }
 };
 
-// Load data on component mount
 onMounted(() => {
   fetchParticipants();
 });
@@ -307,15 +272,23 @@ onMounted(() => {
 <template>
   <div class="participants-page p-4">
     <Toast />
-    
+
     <div class="card">
       <h1 class="text-2xl font-bold mb-4">Participants</h1>
+      
+      <!-- Search Bar -->
+      <div class="flex flex-wrap gap-2 mb-4 items-center">
+        <InputText
+          v-model="searchTerm"
+          placeholder="Search by name..."
+          class="p-inputtext-sm w-full md:w-60"
+          style="max-width: 300px;"
+        />
+      </div>
       
       <!-- Toolbar -->
       <div class="flex flex-wrap gap-2 mb-4 items-center">
         <Button label="New" icon="pi pi-plus" class="p-button-success" @click="openNew" />
-        
-        <!-- File Upload section -->
         <div class="flex-grow-1 flex items-center gap-2">
           <span class="p-input-icon-right">
             <FileUpload
@@ -344,13 +317,12 @@ onMounted(() => {
             title="Download a template spreadsheet with the correct format"
           />
         </div>
-        
         <Button label="Export" icon="pi pi-upload" class="p-button-help" @click="exportCSV" />
       </div>
       
       <!-- Data Table -->
       <DataTable 
-        :value="participants" 
+        :value="filteredParticipants" 
         v-model:selection="selectedParticipants" 
         dataKey="id"
         :paginator="true" 
@@ -372,7 +344,6 @@ onMounted(() => {
             {{ error }}
           </div>
         </template>
-        
         <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
         <Column field="id" header="ID" sortable style="width: 5rem"></Column>
         <Column field="fullName" header="Name" sortable style="min-width: 16rem"></Column>
@@ -407,7 +378,6 @@ onMounted(() => {
         <label for="house">House</label>
         <Dropdown id="house" v-model="participant.houseId" class="w-full" :options="houses" optionLabel="label" optionValue="value" placeholder="Select a House" />
       </div>
-      
       <template #footer>
         <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="hideDialog" />
         <Button label="Save" icon="pi pi-check" class="p-button-text" @click="saveParticipant" />
@@ -433,21 +403,16 @@ onMounted(() => {
           <i class="pi pi-check-circle mr-2" style="font-size: 1.5rem"></i>
           <span class="font-bold">{{ importResults.message }}</span>
         </div>
-        
         <div v-else class="text-red-600 mb-4">
           <i class="pi pi-times-circle mr-2" style="font-size: 1.5rem"></i>
           <span class="font-bold">{{ importResults.message }}</span>
         </div>
-        
         <div v-if="importResults.successCount" class="mb-2">
           Successfully imported: <span class="font-bold">{{ importResults.successCount }}</span> participants
         </div>
-        
         <div v-if="importResults.failureCount" class="mb-4">
           Failed to import: <span class="font-bold">{{ importResults.failureCount }}</span> participants
         </div>
-        
-        <!-- Error details if any -->
         <div v-if="importResults.errors && importResults.errors.length > 0" class="mt-4">
           <h3 class="text-lg font-bold mb-2">Validation Errors:</h3>
           <div v-for="(error, index) in importResults.errors" :key="index" class="p-3 bg-red-50 rounded mb-2">
@@ -460,7 +425,6 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      
       <template #footer>
         <Button label="Close" icon="pi pi-times" class="p-button-text" @click="bulkImportDialog = false" />
       </template>
@@ -474,17 +438,14 @@ onMounted(() => {
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
 .field {
   margin-bottom: 1.5rem;
 }
-
 .field label {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
 }
-
 .confirmation-content {
   display: flex;
   align-items: center;

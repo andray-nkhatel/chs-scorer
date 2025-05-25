@@ -88,7 +88,7 @@ onMounted(() => {
   fetchResults();
   loadParticipants();
   loadEvents();
-  pollingInterval = setInterval(fetchResults,15000);
+  pollingInterval = setInterval(fetchResults,60000);
 });
 
 onUnmounted(()=>{
