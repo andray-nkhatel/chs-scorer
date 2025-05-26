@@ -10,8 +10,9 @@ import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
+import { useStore } from 'vuex';
 import apiClient from '../service/api.service';
-
+const store = useStore();
 const toast = useToast();
 const participants = ref([]);
 const loading = ref(true);
@@ -267,6 +268,8 @@ const exportCSV = () => {
 onMounted(() => {
   fetchParticipants();
 });
+
+const isAdmin = computed(() => store.getters['auth/hasRole']('Admin'));
 </script>
 
 <template>
@@ -287,7 +290,7 @@ onMounted(() => {
       </div>
       
       <!-- Toolbar -->
-      <div v-if="Admin" class="flex flex-wrap gap-2 mb-4 items-center">
+      <div v-if="isAdmin" class="flex flex-wrap gap-2 mb-4 items-center">
         <Button label="New" icon="pi pi-plus" class="p-button-success" @click="openNew" />
         <div class="flex-grow-1 flex items-center gap-2">
           <span class="p-input-icon-right">
@@ -353,7 +356,7 @@ onMounted(() => {
         <Column :exportable="false" style="width: 8rem">
           <template #body="slotProps">
             <Button icon="pi pi-pencil" class="p-button-rounded p-button-success mr-2" @click="editParticipant(slotProps.data)" />
-            <Button v-if="Admin" icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="confirmDeleteParticipant(slotProps.data)" />
+            <Button v-if="isAdmin" icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="confirmDeleteParticipant(slotProps.data)" />
           </template>
         </Column>
       </DataTable>
