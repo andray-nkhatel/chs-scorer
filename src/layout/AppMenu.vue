@@ -11,16 +11,14 @@ const router = useRouter();
 // Logout function
 const logout = async () => {
   try {
-    console.log('Logging out...');
     await store.dispatch('auth/logout');
-    console.log('Logout successful, redirecting to login page');
-    router.push('/auth/login');
   } catch (error) {
     console.error('Logout error:', error);
-    // Even if there's an error, still try to redirect to login
+  } finally {
     router.push('/auth/login');
   }
 };
+
 
 // Define all menu items with their role requirements
 const allMenuItems = [

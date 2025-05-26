@@ -287,7 +287,7 @@ onMounted(() => {
       </div>
       
       <!-- Toolbar -->
-      <div class="flex flex-wrap gap-2 mb-4 items-center">
+      <div v-if="Admin" class="flex flex-wrap gap-2 mb-4 items-center">
         <Button label="New" icon="pi pi-plus" class="p-button-success" @click="openNew" />
         <div class="flex-grow-1 flex items-center gap-2">
           <span class="p-input-icon-right">
@@ -353,7 +353,7 @@ onMounted(() => {
         <Column :exportable="false" style="width: 8rem">
           <template #body="slotProps">
             <Button icon="pi pi-pencil" class="p-button-rounded p-button-success mr-2" @click="editParticipant(slotProps.data)" />
-            <Button icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="confirmDeleteParticipant(slotProps.data)" />
+            <Button v-if="Admin" icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="confirmDeleteParticipant(slotProps.data)" />
           </template>
         </Column>
       </DataTable>

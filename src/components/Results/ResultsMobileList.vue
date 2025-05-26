@@ -1,3 +1,8 @@
+
+
+
+
+
 <template>
     <div class="results-mobile-list">
       <div
@@ -15,7 +20,7 @@
         </div>
         <div class="result-actions">
           <Button icon="pi pi-pencil" class="p-button-rounded p-button-success mr-2" @click="$emit('edit', result)" />
-          <Button icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="$emit('delete', result)" />
+          <Button v-if="isAdmin" icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="$emit('delete', result)" />
         </div>
       </div>
       <div v-if="results.length === 0" class="no-results">
@@ -30,6 +35,8 @@
     getHouseNameForParticipant: Function,
     getCategoryNameForEvent: Function,
   });
+
+  const isAdmin = computed(() => store.getters['auth/hasRole']('Admin'));
   </script>
   
   <style scoped>
@@ -39,13 +46,14 @@
     gap: 1rem;
   }
   .result-card {
-    background: #fff;
+    background: #e0ebec;
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     padding: 1rem;
     display: flex;
-    flex-direction: column;
+    flex-direction: column; 
     justify-content: space-between;
+    flex-wrap: wrap;
   }
   .result-main {
     display: flex;

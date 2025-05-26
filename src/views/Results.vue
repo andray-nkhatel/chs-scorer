@@ -408,7 +408,7 @@ onMounted(() => {
         <Column :exportable="false" style="width: 8rem">
           <template #body="slotProps">
             <Button icon="pi pi-pencil" class="p-button-rounded p-button-success mr-2" @click="editResult(slotProps.data)" />
-            <Button icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="confirmDeleteResult(slotProps.data)" />
+            <Button v-if="isAdmin" icon="pi pi-trash" class="p-button-rounded p-button-danger" @click="confirmDeleteResult(slotProps.data)" />
           </template>
         </Column>
       </DataTable>

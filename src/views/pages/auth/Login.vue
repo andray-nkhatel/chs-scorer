@@ -19,9 +19,6 @@ let isEnabled = ref(false);
 // Add a ref to track if the last login attempt failed
 const lastLoginFailed = ref(false);
 
-
-
-// In Login.vue
 const login = async () => {
   if (!userName.value || !password.value) {
     toast.add({ 
@@ -34,12 +31,10 @@ const login = async () => {
     return;
   }
   
-  // Make sure to set loading state at the beginning
   loading.value = true;
   
   try {
     lastLoginFailed.value = false;
-    // Use 'auth/login' with namespaced store
     await store.dispatch('auth/login', {
       userName: userName.value,
       email: "",
@@ -47,28 +42,41 @@ const login = async () => {
     });
 
     isEnabled = true;
+
+    // Use the correct getter - your store has userRoles getter
+    const userRoles = store.getters['auth/userRoles']; // This returns state.roles
+    console.log('User roles:', userRoles);
     
-    // Get redirect path or go to dashboard
-    const redirectPath = router.currentRoute.value.query.redirect || '/';
+    let redirectPath = '/';
+    
+    // Check if user has Admin role (prioritize Admin over Official)
+    if (userRoles.includes('Admin')) {
+      redirectPath = '/participants';
+    } else if (userRoles.includes('Official')) {
+      redirectPath = '/results';
+    } else {
+      redirectPath = '/';
+    }
+
+    console.log('Redirect path:', redirectPath);
+
+    // If a redirect query param is present, honor it (optional)
+    const queryRedirect = router.currentRoute.value.query.redirect;
+    if (queryRedirect) {
+      redirectPath = queryRedirect;
+    }
+
 
     setTimeout(() => {
       router.push(redirectPath);
     }, 2000);
-    
-    
-    // toast.add({ 
-    //   severity: 'success', 
-    //   summary: 'Success', 
-    //   detail: 'Login successful', 
-    //   life: 3000 
-    // });
+
+
   } catch (error) {
     lastLoginFailed.value = true;
     console.error('Login error:', error);
     isEnabled = false;
-    // Check specifically for 401 status code
     if (error.response && error.response.status === 401) {
-      // Show "Invalid user" for 401 unauthorized errors
       toast.add({
         severity: 'error',
         summary: 'Login Failed',
@@ -76,13 +84,10 @@ const login = async () => {
         life: 1000,
         closable: true,
         sticky: true,
-        // Add a unique ID for each toast
-      id: new Date().getTime().toString()
+        id: new Date().getTime().toString()
       });
     } else {
-      // For all other errors, use existing error handling
       let errorMessage = 'Invalid credentials';
-      
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
@@ -92,7 +97,6 @@ const login = async () => {
           errorMessage = error.message;
         }
       }
-      
       toast.add({
         severity: 'error',
         summary: 'Login Failed',
@@ -102,21 +106,15 @@ const login = async () => {
         sticky: true
       });
     }
-    
-    // Reset password field for security
     password.value = '';
   } finally {
-    // CRITICAL: Ensure loading state is reset in the finally block
-    // This ensures it's reset whether the request succeeds or fails
     setTimeout(() => {
-    loading.value = false;
-  }, 300);
-    // loading.value = false;
+      loading.value = false;
+    }, 300);
   }
 };
 
 const registerNavigation = () => {
-  // Implement forgot password functionality
   router.push('/auth/register');
 };
 </script>
