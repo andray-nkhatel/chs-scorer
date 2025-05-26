@@ -1,3 +1,4 @@
+
 <script setup>
 import AutoComplete from 'primevue/autocomplete';
 import Button from 'primevue/button';
@@ -13,9 +14,13 @@ import apiClient from '../service/api.service';
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 
+import ResultsMobileList from '@/components/Results/ResultsMobileList.vue';
+import { useIsMobile } from '../layout/composables/useIsMobile';
+
+const isMobile = useIsMobile();
+
 const store = useStore();
 const isAdmin = computed(() => store.getters['auth/hasRole']('Admin'));
-// Add this to your ref declarations
 const selectedParticipant = ref(null);
 const filteredParticipants = ref([]);
 const toast = useToast();
@@ -44,7 +49,6 @@ const editMode = ref(false);
 // Data for dropdowns
 const participants = ref([]);
 const events = ref([]);
-// For selecting categories, you need a separate categories array:
 const categories = ref([]);
 
 // Load participants
@@ -55,7 +59,7 @@ const loadParticipants = () => {
         label: participant.fullName,
         value: participant.id,
         name: participant.fullName,
-        houseName: participant.houseName,  // Keep the houseName property
+        houseName: participant.houseName,
         houseId: participant.houseId   
       }));
     })
@@ -66,9 +70,7 @@ const loadParticipants = () => {
 };
 
 const getHouseNameForParticipant = (participantId) => {
-    // Find the participant with the matching ID
     const participant = participants.value.find(p => p.value === participantId);
-    // Return the house name if found, otherwise return a placeholder
     return participant ? participant.houseName : 'N/A';
   }
 
@@ -77,7 +79,9 @@ const loadEvents = () => {
   apiClient.get('/events')
     .then(response => {
       events.value = response.data.map(event => ({
-        label: event.name,
+        label: event.categoryName
+          ? `${event.name} (${event.categoryName})`
+          : event.name,
         value: event.id,
         name: event.name,
         categoryId: event.categoryId,
@@ -91,9 +95,7 @@ const loadEvents = () => {
 };
 
 const getCategoryNameForEvent = (eventId) => {
-    // Find the event with the matching ID
     const event = events.value.find(e => e.value === eventId);
-    // Return the category name if found, otherwise return a placeholder
     return event ? event.categoryName : 'N/A';
   }
 
@@ -117,8 +119,7 @@ const fetchResults = () => {
     });
 };
 
-// Update openNew to reset the selectedParticipant
-const openNew = () => {
+const resetResultForm = () => {
   result.value = {
     id: null,
     participantId: null,
@@ -132,32 +133,36 @@ const openNew = () => {
   };
   selectedParticipant.value = null;
   submitted.value = false;
+};
+
+const openNew = () => {
+  resetResultForm();
   resultDialog.value = true;
   editMode.value = false;
 };
 
-// Update editResult to set the selectedParticipant
 const editResult = (editResult) => {
   result.value = { ...editResult };
-  // Find the participant object for the selected ID
   selectedParticipant.value = participants.value.find(p => p.value === editResult.participantId) || null;
+  const selectedEvent = events.value.find(e => e.value === editResult.eventId);
+  if (selectedEvent) {
+    result.value.categoryId = selectedEvent.categoryId;
+    result.value.categoryName = selectedEvent.categoryName;
+  }
   resultDialog.value = true;
   editMode.value = true;
 };
 
-// Confirm result deletion
 const confirmDeleteResult = (resultToDelete) => {
   result.value = resultToDelete;
   deleteResultDialog.value = true;
 };
 
-// Hide the dialog
 const hideDialog = () => {
   resultDialog.value = false;
   submitted.value = false;
 };
 
-// Participant selection change handler
 const onParticipantChange = () => {
   if (result.value.participantId) {
     const selectedParticipant = participants.value.find(p => p.value === result.value.participantId);
@@ -169,21 +174,21 @@ const onParticipantChange = () => {
   }
 };
 
-// Event selection change handler
 const onEventChange = () => {
   if (result.value.eventId) {
     const selectedEvent = events.value.find(e => e.value === result.value.eventId);
     if (selectedEvent) {
       result.value.eventName = selectedEvent.name;
+      result.value.categoryId = selectedEvent.categoryId;
+      result.value.categoryName = selectedEvent.categoryName;
     }
   } else {
     result.value.eventName = '';
+    result.value.categoryId = null;
+    result.value.categoryName = '';
   }
 };
 
-
-
-// Load categories
 const loadCategories = () => {
   apiClient.get('/categories') 
     .then(response => {
@@ -199,7 +204,6 @@ const loadCategories = () => {
     });
 };
 
-// Category selection change handler
 const onCategoryChange = () => {
   if (result.value.categoryId) {
     const selectedCategory = categories.value.find(c => c.value === result.value.categoryId);
@@ -211,52 +215,38 @@ const onCategoryChange = () => {
   }
 };
 
-// Calculate points based on position
-// const calculatePoints = () => {
-//   if (result.value.position) {
-//     // Example point calculation: 10 points for 1st, 8 for 2nd, 6 for 3rd, 4 for 4th, 2 for 5th, 1 for 6th
-//     const pointsMap = { 1: 10, 2: 8, 3: 6, 4: 4, 5: 2, 6: 1 };
-//     result.value.points = pointsMap[result.value.position] || 0;
-//   } else {
-//     result.value.points = 0;
-//   }
-// };
-
 const calculatePoints = () => {
   if (result.value.position && result.value.position > 0) {
-    // 1st place = 1 point, 2nd = 2 points, etc.
     result.value.points = result.value.position;
   } else {
     result.value.points = 0;
   }
 };
 
-// Save result (add or update)
-const saveResult = () => {
+const validateResultForm = () => {
   submitted.value = true;
-  
   if (!result.value.participantId) {
     toast.add({ severity: 'warn', summary: 'Warning', detail: 'Participant is required', life: 3000 });
-    return;
+    return false;
   }
-  
   if (!result.value.eventId) {
     toast.add({ severity: 'warn', summary: 'Warning', detail: 'Event is required', life: 3000 });
-    return;
+    return false;
   }
-  
   if (!result.value.position || result.value.position < 1) {
     toast.add({ severity: 'warn', summary: 'Warning', detail: 'Position must be a positive number', life: 3000 });
-    return;
+    return false;
   }
-  
-  // Calculate points if not set
   if (!result.value.points) {
     calculatePoints();
   }
-  
+  return true;
+};
+
+const saveResult = () => {
+  if (!validateResultForm()) return;
+
   if (editMode.value) {
-    // Update existing result
     apiClient.put(`/results/${result.value.id}`, result.value)
       .then(() => {
         toast.add({ severity: 'success', summary: 'Success', detail: 'Result Updated', life: 3000 });
@@ -268,7 +258,6 @@ const saveResult = () => {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update result', life: 3000 });
       });
   } else {
-    // Add new result
     apiClient.post('/results', result.value)
       .then(() => {
         toast.add({ severity: 'success', summary: 'Success', detail: 'Result Added', life: 3000 });
@@ -282,7 +271,23 @@ const saveResult = () => {
   }
 };
 
-// Delete result
+// NEW: Save and Add feature
+const saveAndAddResult = () => {
+  if (!validateResultForm()) return;
+
+  apiClient.post('/results', result.value)
+    .then(() => {
+      toast.add({ severity: 'success', summary: 'Success', detail: 'Result Added', life: 3000 });
+      fetchResults();
+      resetResultForm(); // Reset for next entry
+      // Keep dialog open for next entry
+    })
+    .catch(err => {
+      console.error('Error adding result:', err);
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add result', life: 3000 });
+    });
+};
+
 const deleteResult = () => {
   apiClient.delete(`/results/${result.value.id}`)
     .then(() => {
@@ -304,28 +309,20 @@ const searchParticipants = (event) => {
 };
 
 const onParticipantSelect = (event) => {
-  // Set the participantId from the selected participant object
   result.value.participantId = event.value.value;
   result.value.participantName = event.value.name;
 };
 
-
-// Export to CSV
 const exportCSV = () => {
-  // Simple CSV export function
   const downloadCSV = () => {
     const csv = [
-      // CSV header
       Object.keys(results.value[0] || {}).join(','),
-      // CSV rows
       ...results.value.map(item => 
         Object.values(item).map(val => 
           typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
         ).join(',')
       )
     ].join('\n');
-    
-    // Create a blob and download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -336,7 +333,6 @@ const exportCSV = () => {
     link.click();
     document.body.removeChild(link);
   };
-  
   if (results.value.length > 0) {
     downloadCSV();
   } else {
@@ -344,35 +340,25 @@ const exportCSV = () => {
   }
 };
 
-// Load data on component mount
 onMounted(() => {
-
   fetchResults();
   loadParticipants();
   loadEvents();
   loadCategories();
-
-
-   
-  
 });
 </script>
 
 <template>
   <div class="results-page p-4">
     <Toast />
-    
     <div class="card">
       <h1 class="text-2xl font-bold mb-4">Results</h1>
-      
-      <!-- Toolbar -->
       <div class="flex justify-between items-center mb-4">
         <Button label="New" icon="pi pi-plus" class="p-button-success mr-2" @click="openNew" />
         <Button v-if="isAdmin" label="Export" icon="pi pi-upload" class="p-button-help" @click="exportCSV" />
       </div>
-      
-      <!-- Data Table -->
-      <DataTable 
+      <DataTable
+        v-if="!isMobile" 
         :value="results" 
         v-model:selection="selectedResults" 
         dataKey="id"
@@ -395,7 +381,6 @@ onMounted(() => {
             {{ error }}
           </div>
         </template>
-        
         <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
         <Column field="id" header="ID" sortable style="width: 4rem"></Column>
         <Column field="participantName" header="Participant" sortable style="min-width: 8rem"></Column>
@@ -427,77 +412,79 @@ onMounted(() => {
           </template>
         </Column>
       </DataTable>
+      <ResultsMobileList
+        v-else
+        :results="results"
+        :getHouseNameForParticipant="getHouseNameForParticipant"
+        :getCategoryNameForEvent="getCategoryNameForEvent"
+        @edit="editResult"
+        @delete="confirmDeleteResult"
+      />
     </div>
-    
-<!-- Add/Edit Result Dialog -->
-<Dialog v-model:visible="resultDialog" :style="{width: '450px'}" header="Result Details" :modal="true" class="p-fluid">
-  <div class="field">
-    <label for="participant">Participant</label>
-    <AutoComplete
-      id="participant"
-      v-model="selectedParticipant"
-      :suggestions="filteredParticipants"
-      optionLabel="label"
-      placeholder="Search for a Participant"
-      class="w-full"
-      :class="{'p-invalid': submitted && !result.participantId}"
-      @complete="searchParticipants"
-      @item-select="onParticipantSelect"
-    />
-    <small class="p-error" v-if="submitted && !result.participantId">Participant is required.</small>
-  </div>
-  <div class="field">
-    <label for="event">Event</label>
-    <Dropdown
-      id="event"
-      v-model="result.eventId"
-      :options="events"
-      class="w-full"
-      optionLabel="label"
-      optionValue="value"
-      placeholder="Select an Event"
-      :class="{'p-invalid': submitted && !result.eventId}"
-      @change="onEventChange"
-    />
-    <small class="p-error" v-if="submitted && !result.eventId">Event is required.</small>
-  </div>
-  <div class="field">
-    <label for="category">Category</label>
-    <Dropdown
-      id="category"
-      v-model="result.categoryId"
-      :options="categories"
-      class="w-full"
-      optionLabel="label"
-      optionValue="value"
-      placeholder="Select a Category"
-      :class="{'p-invalid': submitted && !result.categoryId}"
-      @change="onCategoryChange"
-    />
-    <small class="p-error" v-if="submitted && !result.categoryId">Category is required.</small>
-  </div>
-  <div class="field">
-    <label for="position">Position</label>
-    <InputNumber
-      id="position"
-      v-model="result.position"
-      class="w-full"
-      :min="1"
-      :max="100"
-      showButtons
-      :class="{'p-invalid': submitted && (!result.position || result.position < 1)}"
-      @change="calculatePoints"
-    />
-    <small class="p-error" v-if="submitted && (!result.position || result.position < 1)">
-      Position is required and must be a positive number.
-    </small>
-  </div>
-  <!-- Points field is removed as requested -->
-  <template #footer>
-    <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="hideDialog" />
-    <Button label="Save" icon="pi pi-check" class="p-button-text" @click="saveResult" />
-  </template>
-</Dialog>
+    <!-- Add/Edit Result Dialog -->
+    <Dialog v-model:visible="resultDialog" :style="{width: '450px'}" header="Result Details" :modal="true" class="p-fluid">
+      <div class="field">
+        <label for="participant">Participant</label>
+        <AutoComplete
+          id="participant"
+          class="w-full"
+          v-model="selectedParticipant"
+          :suggestions="filteredParticipants"
+          optionLabel="label"
+          placeholder="Search for a Participant"
+          :class="{'p-invalid': submitted && !result.participantId}"
+          @complete="searchParticipants"
+          @item-select="onParticipantSelect"
+        />
+        <small class="p-error" v-if="submitted && !result.participantId">Participant is required.</small>
+      </div>
+      <div class="field">
+        <label for="event">Event</label>
+        <Dropdown
+          id="event"
+          v-model="result.eventId"
+          :options="events"
+          class="w-full"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Select an Event"
+          :class="{'p-invalid': submitted && !result.eventId}"
+          @change="onEventChange"
+        />
+        <small class="p-error" v-if="submitted && !result.eventId">Event is required.</small>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <InputNumber
+          v-if="false"
+          style="display:none"
+        />
+        <div class="p-inputtext p-component w-full" style="background: #f5f5f5; color: #333; cursor: not-allowed;">
+          {{ result.categoryName || 'Select an event to see category' }}
+        </div>
+      </div>
+      <div class="field">
+        <label for="position">Position</label>
+        <InputNumber
+          id="position"
+          v-model="result.position"
+          class="w-full"
+          :min="1"
+          :max="100"
+          showButtons
+          :class="{'p-invalid': submitted && (!result.position || result.position < 1)}"
+          @change="calculatePoints"
+        />
+        <small class="p-error" v-if="submitted && (!result.position || result.position < 1)">
+          Position is required and must be a positive number.
+        </small>
+      </div>
+      <template #footer>
+        <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="hideDialog" />
+        <Button label="Save" icon="pi pi-check" class="p-button-text" @click="saveResult" />
+        <Button label="Save and Add" icon="pi pi-plus" class="p-button-text p-button-success" @click="saveAndAddResult" v-if="!editMode" />
+      </template>
+    </Dialog>
     <!-- Delete Result Dialog -->
     <Dialog v-model:visible="deleteResultDialog" :style="{width: '450px'}" header="Confirm" :modal="true">
       <div class="confirmation-content">
@@ -505,10 +492,8 @@ onMounted(() => {
         <span v-if="result">Are you sure you want to delete the result for <b>{{ result.participantName }}</b> in <b>{{ result.eventName }}</b>?</span>
       </div>
       <template #footer>
-       
-          <Button  label="No" icon="pi pi-times" class="p-button-text" @click="deleteResultDialog = false" />
-          <Button label="Yes" icon="pi pi-check" class="p-button-text" @click="deleteResult" />
-       
+        <Button  label="No" icon="pi pi-times" class="p-button-text" @click="deleteResultDialog = false" />
+        <Button label="Yes" icon="pi pi-check" class="p-button-text" @click="deleteResult" />
       </template>
     </Dialog>
   </div>
@@ -535,5 +520,12 @@ onMounted(() => {
 .confirmation-content {
   display: flex;
   align-items: center;
+}
+
+:deep(.p-autocomplete) {
+  width: 100%;
+}
+:deep(.p-autocomplete-input) {
+  width: 100%;
 }
 </style>
