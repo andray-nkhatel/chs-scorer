@@ -83,6 +83,52 @@ const fetchResults = () => {
     });
 };
 
+// CSV Export Logic
+const exportToCSV = () => {
+  // Define the columns you want to export
+  const headers = [
+    'Name',
+    'Position',
+    'Event',
+    'House',
+    'Category',
+    'Points'
+  ];
+
+  // Map results to rows
+  const rows = results.value.map(result => {
+    // Find participant and event info
+    const participant = participants.value.find(p => p.value === result.participantId);
+    const event = events.value.find(e => e.value === result.eventId);
+
+    return [
+      participant ? participant.name : result.participantName || 'N/A',
+      result.position,
+      event ? event.name : result.eventName || 'N/A',
+      getHouseNameForParticipant(result.participantId),
+      getCategoryNameForEvent(result.eventId),
+      result.points
+    ];
+  });
+
+  // Convert to CSV string
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+  ].join('\r\n');
+
+  // Create a Blob and trigger download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'leaderboard_results.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 // Load data on component mount
 onMounted(() => {
   fetchResults();
@@ -100,6 +146,12 @@ onUnmounted(()=>{
 
 <template>
   <div class="results-table-component">
+    <!-- Export Button -->
+    <div class="flex justify-end mb-2">
+      <button class="p-button p-component p-button-sm p-button-outlined" @click="exportToCSV">
+        Export to CSV
+      </button>
+    </div>
     <!-- Data Table -->
     <DataTable 
       :value="results" 

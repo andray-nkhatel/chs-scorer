@@ -8,7 +8,9 @@ import { defineConfig } from 'vite';
 // https://vitejs.dev/config/
 export default defineConfig({
     optimizeDeps: {
-        noDiscovery: true
+        noDiscovery: true,
+         // Include jQuery to ensure proper loading
+        include: ['jquery']
     },
     plugins: [
         vue(),
@@ -20,5 +22,20 @@ export default defineConfig({
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url))
         }
+    },
+     // Define global variables for external libraries
+  define: {
+    global: 'globalThis',
+  },
+  // Ensure external scripts load properly
+  build: {
+    rollupOptions: {
+      external: ['jquery'],
+      output: {
+        globals: {
+          jquery: 'jQuery'
+        }
+      }
     }
+  }
 });
